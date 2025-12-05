@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Country Well-Being Explorer</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://d3js.org/topojson.v3.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #f5f5f5;
+    }
+
+    .header {
+      background: white;
+      padding: 20px;
+      border-bottom: 1px solid #ddd;
+
+      display: flex;        
+      align-items: center;        
+      justify-content: space-between; 
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      color: #333;
+    }
+
+    .layout {
+      display: flex;
+      height: calc(100vh - 84px);
+      position: relative;
+    }
+
+    .left-section {
+      flex: 0 0 60%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #ddd;
+      min-width: 300px;
+    }
+
+    .resize-handle {
+      width: 5px;
+      background: #ddd;
+      cursor: col-resize;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+
+    .resize-handle:hover {
+      background: #999;
+    }
+
+    .resize-handle.dragging {
+      background: #666;
+    }
+
+    #map-container {
+      flex: 1;
+      position: relative;
+      background: white;
+    }
+
+    #map-container svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .map-legend {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      padding: 8px 10px;
+      border-radius: 4px;
+    }
+
+    .map-legend .legend-title {
+      font-size: 10px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #333;
+    }
+
+    .map-legend svg {
+      display: block;
+    }
+
+    .country {
+      stroke: #333;
+      stroke-width: 0.5;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .country:hover {
+      opacity: 0.7;
+      stroke-width: 1.5;
+    }
+
+    .country.selected {
+      stroke: #000;
+      stroke-width: 2;
+    }
+
+    #controls {
+      padding: 15px 20px;
+      box-sizing: border-box;
+      background: white;
+      border-top: 1px solid #ddd;
+    }
+
+    #controls h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .control-group {
+      margin-bottom: 10px;
+    }
+
+    .control-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: #555;
+    }
+
+    .control-group select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .metric-description {
+      margin-top: 15px;
+      padding: 12px;
+      background: #f9f9f9;
+      border-radius: 4px;
+      border-left: 3px solid #4f46e5;
+    }
+
+    .metric-description h4 {
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .metric-description p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #666;
+    }
+
+    #charts-container {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background: #f5f5f5;
+      min-width: 300px;
+    }
+
+    .chart-options {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .checkbox-group label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #555;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    /* Clear button for selected countries */
+    .clear-button {
+      margin-top: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+      cursor: pointer;
+    }
+
+    .clear-button:hover {
+      background: #eee;
+    }
+
+    .selected-countries {
+      margin-bottom: 20px;
+    }
+
+    .country-tag {
+      display: inline-flex;
+      align-items: center;
+      background: #4f46e5;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 16px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .country-tag .remove {
+      margin-left: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      opacity: 0.8;
+    }
+
+    .country-tag .remove:hover {
+      opacity: 1;
+    }
+
+    .chart-panel {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .chart-panel h3 {
+      margin: 0 0 15px 0;
+      font-size: 16px;
+      color: #333;
+      font-weight: 600;
+    }
+
+    .no-selection {
+      text-align: center;
+      color: #999;
+      padding: 40px;
+      font-size: 14px;
+    }
+
+    .tooltip {
+      position: absolute;
+      background: white;
+      padding: 8px 12px;
+      border: 1px solid #999;
+      border-radius: 4px;
+      pointer-events: none;
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity 0.15s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 15px;
+      gap: 15px;
+      max-width: 100%;
+    }
+
+    .chart-legend-item {
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .chart-legend-color {
+      width: 20px;
+      height: 12px;
+      margin-right: 6px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.4);
+    }
+
+    /* Modal box */
+    .modal-content {
+      background: white;
+      width: 60%;
+      max-width: 600px;
+      margin: 12% auto;
+      padding: 20px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    /* Close button */
+    .close {
+      float: right;
+      font-size: 22px;
+      cursor: pointer;
+      color: #444;
+    }
+    .close:hover {
+      color: black;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Country Well-Being Explorer</h1>
+
+    <button id="open-modal" style="margin-top: 10px; padding: 6px 12px;">
+      About this visualization
+    </button>
+  </div>
+
+  <!-- Modal Structure -->
+  <div id="info-modal" class="modal">
+    <div class="modal-content">
+      <span id="close-modal" class="close">&times;</span>
+      <h2>About This Visualization</h2>
+      <p>
+        Write the explanation about your visualization here.
+      </p>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="left-section">
+      <div id="map-container">
+        <svg></svg>
+        <div class="map-legend">
+          <div class="legend-title">Legend</div>
+          <svg id="legend-svg" width="180" height="50"></svg>
+        </div>
+      </div>
+
+      <div id="controls">
+        <h3>Color Map</h3>
+        <div class="control-group">
+          <select id="metric-select">
+            <option value="Thriving Index">Thriving Index</option>
+            <option value="Health Index">Health Index</option>
+            <option value="Balance in Life">Balance in Life</option>
+            <option value="Enjoy Work">Enjoy Work</option>
+            <option value="Work Freedom">Work Freedom</option>
+          </select>
+        </div>
+
+        <div class="metric-description">
+          <h4>About this metric</h4>
+          <p id="metric-description-text">This metric provides valuable insights into population well-being across different countries and demographic groups. Select different metrics above to explore various aspects of quality of life.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="resize-handle" id="resize-handle"></div>
+
+    <div id="charts-container">
+      <div class="no-selection">
+        Click on countries (up to 4) to compare demographic breakdowns
+      </div>
+    </div>
+  </div>
+
+  <div class="tooltip"></div>
+
+  <script>
+    // Modal logic
+    const modal = document.getElementById("info-modal");
+    const openBtn = document.getElementById("open-modal");
+    const closeBtn = document.getElementById("close-modal");
+
+    openBtn.onclick = () => {
+      modal.style.display = "block";
+    };
+
+    closeBtn.onclick = () => {
+      modal.style.display = "none";
+    };
+
+    window.onclick = (event) => {
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
+    };
+
+    const CSV_FILENAME = "data/better_wellbeing.csv";
+
+    const mapContainer = document.getElementById("map-container");
+    const width = mapContainer.clientWidth;
+    const height = mapContainer.clientHeight;
+
+    const svg = d3.select("#map-container svg");
+    const tooltip = d3.select(".tooltip");
+
+    const projection = d3.geoMercator()
+      .scale(100)
+      .translate([width / 2, height / 2]);
+
+    const path = d3.geoPath().projection(projection);
+
+    const g = svg.append("g");
+
+    const zoom = d3.zoom()
+      .scaleExtent([1, 8])
+      .translateExtent([[0, 0], [width, height]])
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+      });
+
+    svg.call(zoom);
+
+    const resizeHandle = document.getElementById('resize-handle');
+    const leftSection = document.querySelector('.left-section');
+    const layout = document.querySelector('.layout');
+    let isResizing = false;
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      resizeHandle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+
+      const layoutRect = layout.getBoundingClientRect();
+      const newWidth = ((e.clientX - layoutRect.left) / layoutRect.width) * 100;
+
+      if (newWidth >= 20 && newWidth <= 80) {
+        leftSection.style.flexBasis = `${newWidth}%`;
+        if (selectedCountries.length > 0) {
+          drawComparisonChart();
+        }
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        resizeHandle.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
+
+    let data = [];
+    let globalData = [];
+    let selectedCountries = [];
+    let currentMetric = "Thriving Index";
+    let currentDemographic = "Age";
+    let metricColumnsMap = {};
+    let availableDemographics = [];
+    let showGlobalAverages = false;
+
+    const countryColors = ["#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#e11d48"];
+
+    function parsePercentage(str) {
+      if (!str || str === "" || str === " ") return null;
+      const num = parseFloat(str.replace('%', ''));
+      return isNaN(num) ? null : num;
+    }
+
+    Promise.all([
+      d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"),
+      d3.text(CSV_FILENAME),
+    ]).then(([worldData, csvText]) => {
+      const lines = csvText.split('\n');
+      
+      const headerRow1 = lines[0].split(',');
+      const headerRow2 = lines[1].split(',');
+      
+      const columnCounts = {};
+      const columnNames = headerRow1.map((q, i) => {
+        if (i < 3) return ['Country', 'Demographic', 'Value'][i];
+        const question = q.trim();
+        const response = headerRow2[i] ? headerRow2[i].trim() : '';
+        
+        if (question && response && response !== 'Rate') {
+          const baseName = `${question}_${response}`;
+          if (columnCounts[baseName]) {
+            columnCounts[baseName]++;
+            return `${baseName}_${columnCounts[baseName]}`;
+          } else {
+            columnCounts[baseName] = 1;
+            return baseName;
+          }
+        }
+        return question || `col_${i}`;
+      });
+      
+      metricColumnsMap = {
+        "Thriving Index": "Thriving Index",
+        "Health Index": "Health Problems_Yes",
+        "Balance in Life": "Various Aspects of Life in Balance_Yes",
+        "Enjoy Work": "Enjoy the Work You Do Every Day_Yes",
+        "Work Freedom": "Many Choices in Type of Work_Yes"
+      };
+      
+      data = lines.slice(3)
+        .filter(line => line.trim() !== '')
+        .map(line => {
+          const values = line.split(',');
+          const row = {
+            Country: values[0].trim(),
+            Demographic_Type: values[1].trim(),
+            Demographic_Value: values[2].trim()
+          };
+          
+          columnNames.forEach((colName, i) => {
+            if (i >= 3) {
+              row[colName] = parsePercentage(values[i]);
+            }
+          });
+          
+          return row;
+        })
+        .filter(d => d.Country && d.Country.trim() !== '');
+
+      availableDemographics = [...new Set(data.map(d => d.Demographic_Type))];
+      currentDemographic = availableDemographics[0];
+
+      updateMap(worldData);
+    });
+
+    function updateMap(worldData) {
+      const csvMetric = metricColumnsMap[currentMetric];
+      
+      const countryMetrics = d3.rollup(
+        data,
+        v => {
+          const values = v.map(d => d[csvMetric]).filter(val => val !== null && !isNaN(val));
+          if (values.length === 0) return null;
+          const avg = d3.mean(values);
+          return currentMetric === "Health Index" ? 100 - avg : avg;
+        },
+        d => d.Country
+      );
+
+      const values = [...countryMetrics.values()].filter(v => v !== null && !isNaN(v));
+      const colorScale = d3.scaleSequential(d3.interpolateBlues)
+        .domain([d3.min(values), d3.max(values)]);
+
+      drawLegend(colorScale, d3.min(values), d3.max(values));
+
+      const countries = topojson.feature(worldData, worldData.objects.countries);
+
+      g.selectAll("path").remove();
+
+      const countryNameMap = {
+        "United States of America": "United States"
+      };
+
+      g.selectAll("path")
+        .data(countries.features)
+        .enter()
+        .append("path")
+        .attr("class", "country")
+        .attr("d", path)
+        .attr("fill", d => {
+          const mapName = d.properties.name;
+          const csvName = countryNameMap[mapName] || mapName;
+          const value = countryMetrics.get(csvName);
+          return value != null && !isNaN(value) ? colorScale(value) : "#e0e0e0";
+        })
+        .classed("selected", d => {
+          const mapName = d.properties.name;
+          return selectedCountries.includes(mapName);
+        })
+        .on("click", function(event, d) {
+          const mapName = d.properties.name;
+          const csvName = countryNameMap[mapName] || mapName;
+          
+          const hasData = data.some(row => row.Country === csvName);
+          
+          if (selectedCountries.includes(mapName)) {
+            selectedCountries = selectedCountries.filter(c => c !== mapName);
+          } else {
+            if (selectedCountries.length < 4 && hasData) {
+              selectedCountries.push(mapName);
+            }
+          }
+          
+          g.selectAll("path")
+            .classed("selected", d => selectedCountries.includes(d.properties.name));
+          
+          updateCharts();
+        })
+        .on("mouseover", function(event, d) {
+          const mapName = d.properties.name;
+          const csvName = countryNameMap[mapName] || mapName;
+          const value = countryMetrics.get(csvName);
+          
+          tooltip
+            .style("opacity", 1)
+            .html(
+              `<strong>${mapName}</strong><br>` +
+              (value != null && !isNaN(value) ? `${currentMetric}: ${value.toFixed(1)}%` : "No data")
+            );
+        })
+        .on("mousemove", event => {
+          tooltip
+            .style("left", event.pageX + 10 + "px")
+            .style("top", event.pageY + 10 + "px");
+        })
+        .on("mouseout", function() {
+          tooltip.style("opacity", 0);
+        });
+    }
+
+    function drawLegend(colorScale, min, max) {
+      const legendSvg = d3.select("#legend-svg");
+      legendSvg.selectAll("*").remove();
+
+      const legendWidth = 150;
+      const legendHeight = 10;
+
+      const defs = legendSvg.append("defs");
+      const gradient = defs.append("linearGradient")
+        .attr("id", "legend-gradient")
+        .attr("x1", "0%")
+        .attr("x2", "100%");
+
+      gradient.append("stop")
+        .attr("offset", "0%")
+        .attr("stop-color", colorScale(min));
+
+      gradient.append("stop")
+        .attr("offset", "100%")
+        .attr("stop-color", colorScale(max));
+
+      legendSvg.append("rect")
+        .attr("x", 15)
+        .attr("y", 8)
+        .attr("width", legendWidth)
+        .attr("height", legendHeight)
+        .style("fill", "url(#legend-gradient)")
+        .style("stroke", "#333")
+        .style("stroke-width", 0.5);
+
+      const scale = d3.scaleLinear()
+        .domain([min, max])
+        .range([15, 15 + legendWidth]);
+
+      const axis = d3.axisBottom(scale)
+        .ticks(4)
+        .tickSize(3);
+
+      legendSvg.append("g")
+        .attr("transform", `translate(0, ${8 + legendHeight})`)
+        .call(axis)
+        .style("font-size", "9px");
+    }
+
+    function removeCountry(countryName) {
+      selectedCountries = selectedCountries.filter(c => c !== countryName);
+      
+      g.selectAll("path")
+        .classed("selected", d => selectedCountries.includes(d.properties.name));
+      
+      if (countryName === "Global Average") {
+        showGlobalAverages = false;
+      }
+      
+      updateCharts();
+    }
+
+    function updateCharts() {
+      const container = d3.select("#charts-container");
+      container.html("");
+
+      if (selectedCountries.length === 0) {
+        container.append("div")
+          .attr("class", "no-selection")
+          .text("Click on countries (up to 4) to compare demographic breakdowns");
+        return;
+      }
+
+      const optionsDiv = container.append("div")
+        .attr("class", "chart-options");
+
+      const checkboxDiv = optionsDiv.append("div")
+        .attr("class", "checkbox-group");
+
+      checkboxDiv.append("input")
+        .attr("type", "checkbox")
+        .attr("id", "show-global-avg")
+        .property("checked", showGlobalAverages)
+        .on("change", function() {
+          showGlobalAverages = this.checked;
+          
+          if (showGlobalAverages) {
+            if (!selectedCountries.includes("Global Average")) {
+              selectedCountries.push("Global Average");
+            }
+          } else {
+            selectedCountries = selectedCountries.filter(c => c !== "Global Average");
+          }
+          
+          updateCharts();
+        });
+
+      checkboxDiv.append("label")
+        .attr("for", "show-global-avg")
+        .text("Show global averages");
+
+      // Clear button: removes all selected countries except "Global Average"
+      optionsDiv.append("button")
+        .attr("type", "button")
+        .attr("class", "clear-button")
+        .text("Clear countries")
+        .on("click", () => {
+          // Keep only "Global Average" if it's currently selected
+          selectedCountries = selectedCountries.filter(c => c === "Global Average");
+
+          // Update map highlighting
+          g.selectAll("path")
+            .classed("selected", d => selectedCountries.includes(d.properties.name));
+
+          updateCharts();
+        });
+
+      const countryNameMap = {
+        "United States of America": "United States"
+      };
+
+      const tagsDiv = container.append("div")
+        .attr("class", "selected-countries");
+
+      selectedCountries.forEach(country => {
+        const tag = tagsDiv.append("div")
+          .attr("class", "country-tag")
+          .style("background", countryColors[selectedCountries.indexOf(country) % countryColors.length]);
+
+        tag.append("span").text(country);
+        tag.append("span")
+          .attr("class", "remove")
+          .text("×")
+          .on("click", () => removeCountry(country));
+      });
+
+      const selectorDiv = container.append("div")
+        .attr("class", "control-group")
+        .style("margin-bottom", "20px");
+
+      selectorDiv.append("label").text("Select Demographic");
+      const select = selectorDiv.append("select")
+        .attr("id", "demographic-select")
+        .on("change", function() {
+          currentDemographic = this.value;
+          drawComparisonChart();
+        });
+
+      availableDemographics.forEach(demo => {
+        select.append("option")
+          .attr("value", demo)
+          .property("selected", demo === currentDemographic)
+          .text(demo);
+      });
+
+      const panel = container.append("div")
+        .attr("class", "chart-panel");
+
+      panel.append("h3")
+        .text(`${currentDemographic} - ${currentMetric}`);
+
+      const chartSvg = panel.append("svg")
+        .attr("id", "comparison-chart");
+
+      drawComparisonChart();
+    }
+
+    function drawComparisonChart() {
+      d3.select(".chart-panel h3")
+        .text(`${currentDemographic} - ${currentMetric}`);
+    
+      const svg = d3.select("#comparison-chart");
+      svg.selectAll("*").remove();
+
+      const container = document.getElementById("charts-container");
+      const containerWidth = container.clientWidth;
+      
+      const margin = { top: 20, right: 20, bottom: 100, left: 60 };
+      const width = Math.max(300, containerWidth - 40 - margin.left - margin.right);
+      const height = 400 - margin.top - margin.bottom;
+
+      svg
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom);
+
+      const gChart = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+      const countryNameMap = {
+        "United States of America": "United States"
+      };
+
+      const csvMetric = metricColumnsMap[currentMetric];
+      const chartData = [];
+
+      selectedCountries.forEach((mapCountry, countryIdx) => {
+        const csvCountry = countryNameMap[mapCountry] || mapCountry;
+        
+        const countryData = data.filter(d => 
+            d.Country === csvCountry && 
+            d.Demographic_Type === currentDemographic
+        );
+
+        countryData.forEach(d => {
+          let value = d[csvMetric];
+          if (currentMetric === "Health Index" && value !== null && !isNaN(value)) {
+            value = 100 - value;
+          }
+          if (value !== null && !isNaN(value)) {
+            chartData.push({
+              country: mapCountry,
+              countryIdx: countryIdx,
+              demographic: d.Demographic_Value,
+              value: value
+            });
+          }
+        });
+      });
+
+      if (chartData.length === 0) {
+        gChart.append("text")
+          .attr("x", width / 2)
+          .attr("y", height / 2)
+          .attr("text-anchor", "middle")
+          .style("fill", "#999")
+          .text("No data available");
+        return;
+      }
+
+      const demographicValues = [...new Set(chartData.map(d => d.demographic))];
+
+      const x0 = d3.scaleBand()
+        .domain(demographicValues)
+        .range([0, width])
+        .padding(0.2);
+
+      const x1 = d3.scaleBand()
+        .domain(selectedCountries)
+        .range([0, x0.bandwidth()])
+        .padding(0.05);
+
+      const y = d3.scaleLinear()
+        .domain([0, 100])
+        .range([height, 0]);
+
+      gChart.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(x0))
+        .selectAll("text")
+        .attr("transform", "rotate(-45)")
+        .style("text-anchor", "end")
+        .attr("dx", "-.8em")
+        .attr("dy", ".15em")
+        .style("font-size", "11px")
+        .each(function() {
+          const text = d3.select(this);
+          const textContent = text.text();
+          
+          if (textContent.length > 15) {
+            text.text(textContent.substring(0, 13) + "...");
+            text.append("title").text(textContent);
+          }
+        });
+
+      gChart.append("g")
+        .call(d3.axisLeft(y).ticks(10).tickFormat(d => d + "%"))
+        .style("font-size", "11px");
+
+      const demographicGroups = gChart.selectAll(".demographic-group")
+        .data(demographicValues)
+        .enter()
+        .append("g")
+        .attr("class", "demographic-group")
+        .attr("transform", d => `translate(${x0(d)},0)`);
+
+      demographicGroups.selectAll("rect")
+        .data(demo => chartData.filter(d => d.demographic === demo))
+        .enter()
+        .append("rect")
+        .attr("x", d => x1(d.country))
+        .attr("y", d => y(d.value))
+        .attr("width", x1.bandwidth())
+        .attr("height", d => height - y(d.value))
+        .attr("fill", d => countryColors[d.countryIdx % countryColors.length])
+        .attr("opacity", 0.8)
+        .on("mouseover", function(event, d) {
+          d3.select(this).attr("opacity", 1);
+
+          tooltip
+            .style("opacity", 1)
+            .html(
+              `<strong>${d.country}</strong><br>` +
+              `${d.demographic}<br>` +
+              `${currentMetric}: ${d.value.toFixed(1)}%`
+            );
+        })
+        .on("mousemove", event => {
+          tooltip
+            .style("left", event.pageX + 10 + "px")
+            .style("top", event.pageY + 10 + "px");
+        })
+        .on("mouseout", function(event, d) {
+          d3.select(this).attr("opacity", 0.8);
+          tooltip.style("opacity", 0);
+        });
+
+      const legendGroup = svg.append("g")
+        .attr("transform", `translate(${margin.left}, ${height + margin.top + 60})`);
+
+      selectedCountries.forEach((country, idx) => {
+        const legendItem = legendGroup.append("g")
+          .attr("class", "chart-legend-item");
+
+        legendItem.append("rect")
+          .attr("class", "chart-legend-color")
+          .attr("width", 20)
+          .attr("height", 12)
+          .attr("fill", countryColors[idx % countryColors.length]);
+
+        legendItem.append("text")
+          .attr("x", 25)
+          .attr("y", 10)
+          .style("font-size", "12px")
+          .text(country);
+      });
+
+      let currentX = 0;
+      let currentY = 0;
+      const lineHeight = 20;
+      const maxWidth = width;
+
+      legendGroup.selectAll(".chart-legend-item").each(function(d, i) {
+        const item = d3.select(this);
+        const bbox = item.node().getBBox();
+        const itemWidth = bbox.width + 15;
+
+        if (currentX + itemWidth > maxWidth && currentX > 0) {
+          currentX = 0;
+          currentY += lineHeight;
+        }
+
+        item.attr("transform", `translate(${currentX}, ${currentY})`);
+        currentX += itemWidth;
+      });
+    }
+
+    document.getElementById("metric-select").addEventListener("change", function() {
+      currentMetric = this.value;
+      
+      const descriptions = {
+        "Thriving Index": "This metric provides valuable insights into population well-being across different countries and demographic groups. Select different metrics above to explore various aspects of quality of life.",
+        "Health Index": "This metric shows the percentage of respondents who report good health outcomes. Higher values indicate better overall health in the population.",
+        "Balance in Life": "This metric measures how people perceive balance across various aspects of their lives, including work, family, and personal time.",
+        "Enjoy Work": "This metric indicates the percentage of people who report enjoying the work they do every day, reflecting job satisfaction and engagement.",
+        "Work Freedom": "This metric shows the degree to which people feel they have choices in the type of work they can pursue."
+      };
+      
+      document.getElementById("metric-description-text").textContent = descriptions[currentMetric];
+      
+      d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
+        .then(worldData => {
+          updateMap(worldData);
+          if (selectedCountries.length > 0) {
+            drawComparisonChart();
+          }
+        });
+    });
+  </script>
+</body>
+</html>
