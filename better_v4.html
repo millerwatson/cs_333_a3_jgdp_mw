@@ -68,20 +68,17 @@
 
     .map-legend {
       position: absolute;
-      bottom: 20px;
-      left: 20px;
-      background: rgba(255, 255, 255, 0.15);
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-      backdrop-filter: blur(5px);
+      bottom: 10px;
+      left: 10px;
+      padding: 8px 10px;
+      border-radius: 4px;
     }
 
     .map-legend .legend-title {
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 600;
-      margin-bottom: 8px;
-      color: #555;
+      margin-bottom: 5px;
+      color: #333;
     }
 
     .map-legend svg {
@@ -259,15 +256,18 @@
 
     .chart-legend {
       display: flex;
+      flex-wrap: wrap;
       justify-content: center;
       margin-top: 15px;
-      gap: 20px;
+      gap: 15px;
+      max-width: 100%;
     }
 
     .chart-legend-item {
       display: flex;
       align-items: center;
       font-size: 12px;
+      white-space: nowrap;
     }
 
     .chart-legend-color {
@@ -275,6 +275,7 @@
       height: 12px;
       margin-right: 6px;
       border-radius: 2px;
+      flex-shrink: 0;
     }
   </style>
 </head>
@@ -284,18 +285,15 @@
   </div>
 
   <div class="layout">
-    <!-- Left: Map and Controls -->
     <div class="left-section">
-      <!-- Map -->
       <div id="map-container">
         <svg></svg>
         <div class="map-legend">
           <div class="legend-title">Legend</div>
-          <svg id="legend-svg" width="240" height="60"></svg>
+          <svg id="legend-svg" width="180" height="50"></svg>
         </div>
       </div>
 
-      <!-- Control Panel -->
       <div id="controls">
         <h3>Color Map</h3>
         <div class="control-group">
@@ -315,10 +313,8 @@
       </div>
     </div>
 
-    <!-- Resize Handle -->
     <div class="resize-handle" id="resize-handle"></div>
 
-    <!-- Right: Charts -->
     <div id="charts-container">
       <div class="no-selection">
         Click on countries (up to 4) to compare demographic breakdowns
@@ -329,7 +325,6 @@
   <div class="tooltip"></div>
 
   <script>
-    // CSV filename to load
     const CSV_FILENAME = "data/better_wellbeing.csv";
 
     const mapContainer = document.getElementById("map-container");
@@ -356,7 +351,6 @@
 
     svg.call(zoom);
 
-    // Resize handle functionality
     const resizeHandle = document.getElementById('resize-handle');
     const leftSection = document.querySelector('.left-section');
     const layout = document.querySelector('.layout');
@@ -375,9 +369,11 @@
       const layoutRect = layout.getBoundingClientRect();
       const newWidth = ((e.clientX - layoutRect.left) / layoutRect.width) * 100;
 
-      // Constrain between 20% and 80%
       if (newWidth >= 20 && newWidth <= 80) {
         leftSection.style.flexBasis = `${newWidth}%`;
+        if (selectedCountries.length > 0) {
+          drawComparisonChart();
+        }
       }
     });
 
@@ -391,6 +387,7 @@
     });
 
     let data = [];
+    let globalData = [];
     let selectedCountries = [];
     let currentMetric = "Thriving Index";
     let currentDemographic = "Age";
@@ -398,28 +395,23 @@
     let availableDemographics = [];
     let showGlobalAverages = false;
 
-    // Color palette for countries
-    const countryColors = ["#4f46e5", "#06b6d4", "#10b981", "#f59e0b"];
+    const countryColors = ["#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#e11d48"];
 
-    // Parse percentage strings
     function parsePercentage(str) {
       if (!str || str === "" || str === " ") return null;
       const num = parseFloat(str.replace('%', ''));
       return isNaN(num) ? null : num;
     }
 
-    // Load data
     Promise.all([
       d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"),
-      d3.text(CSV_FILENAME)
+      d3.text(CSV_FILENAME),
     ]).then(([worldData, csvText]) => {
-      // Parse CSV manually to handle the multi-row header
       const lines = csvText.split('\n');
       
       const headerRow1 = lines[0].split(',');
       const headerRow2 = lines[1].split(',');
       
-      // Create combined column names, handling duplicates
       const columnCounts = {};
       const columnNames = headerRow1.map((q, i) => {
         if (i < 3) return ['Country', 'Demographic', 'Value'][i];
@@ -428,7 +420,6 @@
         
         if (question && response && response !== 'Rate') {
           const baseName = `${question}_${response}`;
-          // Handle duplicates by counting occurrences
           if (columnCounts[baseName]) {
             columnCounts[baseName]++;
             return `${baseName}_${columnCounts[baseName]}`;
@@ -440,17 +431,9 @@
         return question || `col_${i}`;
       });
       
-      console.log('All column names:', columnNames);
-      console.log('Looking for Health Problems columns:', columnNames.filter(c => c.includes('Health')));
-      
-      // Country name mapping from map to CSV
-      const countryNameMap = {
-        "United States of America": "United States"
-      };
-      
       metricColumnsMap = {
         "Thriving Index": "Thriving Index",
-        "Health Index": "Health Problems_Yes", // Will calculate 100 - Yes to get health index
+        "Health Index": "Health Problems_Yes",
         "Balance in Life": "Various Aspects of Life in Balance_Yes",
         "Enjoy Work": "Enjoy the Work You Do Every Day_Yes",
         "Work Freedom": "Many Choices in Type of Work_Yes"
@@ -476,26 +459,14 @@
         })
         .filter(d => d.Country && d.Country.trim() !== '');
 
-      console.log('Sample data:', data.slice(0, 2));
-      console.log('Unique countries:', [...new Set(data.map(d => d.Country))].slice(0, 10));
-      console.log('Metric columns:', metricColumnsMap);
-      console.log('Sample Health Problems data:', data.slice(0, 2).map(d => ({
-        country: d.Country,
-        'Health Problems_Yes': d['Health Problems_Yes'],
-        'Health Problems_No': d['Health Problems_No']
-      })));
-
-      // Get available demographics
       availableDemographics = [...new Set(data.map(d => d.Demographic_Type))];
       currentDemographic = availableDemographics[0];
 
-      // Calculate average metric values per country for map coloring
       updateMap(worldData);
     });
 
     function updateMap(worldData) {
       const csvMetric = metricColumnsMap[currentMetric];
-      console.log('Current metric:', currentMetric, 'CSV column:', csvMetric);
       
       const countryMetrics = d3.rollup(
         data,
@@ -503,13 +474,10 @@
           const values = v.map(d => d[csvMetric]).filter(val => val !== null && !isNaN(val));
           if (values.length === 0) return null;
           const avg = d3.mean(values);
-          // For Health Index, invert (100 - value) since we're using "Yes" to problems
           return currentMetric === "Health Index" ? 100 - avg : avg;
         },
         d => d.Country
       );
-
-      console.log('Country metrics sample:', Array.from(countryMetrics.entries()).slice(0, 5));
 
       const values = [...countryMetrics.values()].filter(v => v !== null && !isNaN(v));
       const colorScale = d3.scaleSequential(d3.interpolateBlues)
@@ -519,10 +487,8 @@
 
       const countries = topojson.feature(worldData, worldData.objects.countries);
 
-      // Remove existing paths
       g.selectAll("path").remove();
 
-      // Country name mapping from map to CSV
       const countryNameMap = {
         "United States of America": "United States"
       };
@@ -547,22 +513,16 @@
           const mapName = d.properties.name;
           const csvName = countryNameMap[mapName] || mapName;
           
-          // Check if country has data
           const hasData = data.some(row => row.Country === csvName);
           
-          console.log('Clicked country:', mapName, 'CSV name:', csvName, 'Has data:', hasData);
-          
           if (selectedCountries.includes(mapName)) {
-            // Deselect
             selectedCountries = selectedCountries.filter(c => c !== mapName);
           } else {
-            // Select (max 4)
             if (selectedCountries.length < 4 && hasData) {
               selectedCountries.push(mapName);
             }
           }
           
-          // Update selection styling
           g.selectAll("path")
             .classed("selected", d => selectedCountries.includes(d.properties.name));
           
@@ -594,8 +554,8 @@
       const legendSvg = d3.select("#legend-svg");
       legendSvg.selectAll("*").remove();
 
-      const legendWidth = 200;
-      const legendHeight = 12;
+      const legendWidth = 150;
+      const legendHeight = 10;
 
       const defs = legendSvg.append("defs");
       const gradient = defs.append("linearGradient")
@@ -612,8 +572,8 @@
         .attr("stop-color", colorScale(max));
 
       legendSvg.append("rect")
-        .attr("x", 20)
-        .attr("y", 10)
+        .attr("x", 15)
+        .attr("y", 8)
         .attr("width", legendWidth)
         .attr("height", legendHeight)
         .style("fill", "url(#legend-gradient)")
@@ -622,24 +582,27 @@
 
       const scale = d3.scaleLinear()
         .domain([min, max])
-        .range([20, 20 + legendWidth]);
+        .range([15, 15 + legendWidth]);
 
       const axis = d3.axisBottom(scale)
-        .ticks(5)
-        .tickSize(4);
+        .ticks(4)
+        .tickSize(3);
 
       legendSvg.append("g")
-        .attr("transform", `translate(0, ${10 + legendHeight})`)
+        .attr("transform", `translate(0, ${8 + legendHeight})`)
         .call(axis)
-        .style("font-size", "10px");
+        .style("font-size", "9px");
     }
 
     function removeCountry(countryName) {
       selectedCountries = selectedCountries.filter(c => c !== countryName);
       
-      // Update map selection
       g.selectAll("path")
         .classed("selected", d => selectedCountries.includes(d.properties.name));
+      
+      if (countryName === "Global Average") {
+        showGlobalAverages = false;
+      }
       
       updateCharts();
     }
@@ -655,7 +618,6 @@
         return;
       }
 
-      // Chart options (checkbox)
       const optionsDiv = container.append("div")
         .attr("class", "chart-options");
 
@@ -668,26 +630,33 @@
         .property("checked", showGlobalAverages)
         .on("change", function() {
           showGlobalAverages = this.checked;
-          drawComparisonChart();
+          
+          if (showGlobalAverages) {
+            if (!selectedCountries.includes("Global Average")) {
+              selectedCountries.push("Global Average");
+            }
+          } else {
+            selectedCountries = selectedCountries.filter(c => c !== "Global Average");
+          }
+          
+          updateCharts();
         });
 
       checkboxDiv.append("label")
         .attr("for", "show-global-avg")
         .text("Show global averages");
 
-      // Country name mapping from map to CSV
       const countryNameMap = {
         "United States of America": "United States"
       };
 
-      // Selected countries tags
       const tagsDiv = container.append("div")
         .attr("class", "selected-countries");
 
       selectedCountries.forEach(country => {
         const tag = tagsDiv.append("div")
           .attr("class", "country-tag")
-          .style("background", countryColors[selectedCountries.indexOf(country)]);
+          .style("background", countryColors[selectedCountries.indexOf(country) % countryColors.length]);
 
         tag.append("span").text(country);
         tag.append("span")
@@ -696,7 +665,6 @@
           .on("click", () => removeCountry(country));
       });
 
-      // Demographic selector
       const selectorDiv = container.append("div")
         .attr("class", "control-group")
         .style("margin-bottom", "20px");
@@ -716,7 +684,6 @@
           .text(demo);
       });
 
-      // Chart panel
       const panel = container.append("div")
         .attr("class", "chart-panel");
 
@@ -733,8 +700,11 @@
       const svg = d3.select("#comparison-chart");
       svg.selectAll("*").remove();
 
-      const margin = { top: 20, right: 20, bottom: 80, left: 60 };
-      const width = 500 - margin.left - margin.right;
+      const container = document.getElementById("charts-container");
+      const containerWidth = container.clientWidth;
+      
+      const margin = { top: 20, right: 20, bottom: 100, left: 60 };
+      const width = Math.max(300, containerWidth - 40 - margin.left - margin.right);
       const height = 400 - margin.top - margin.bottom;
 
       svg
@@ -744,12 +714,10 @@
       const g = svg.append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-      // Country name mapping from map to CSV
       const countryNameMap = {
         "United States of America": "United States"
       };
 
-      // Get data for all selected countries
       const csvMetric = metricColumnsMap[currentMetric];
       const chartData = [];
 
@@ -757,13 +725,12 @@
         const csvCountry = countryNameMap[mapCountry] || mapCountry;
         
         const countryData = data.filter(d => 
-          d.Country === csvCountry && 
-          d.Demographic_Type === currentDemographic
+            d.Country === csvCountry && 
+            d.Demographic_Type === currentDemographic
         );
 
         countryData.forEach(d => {
           let value = d[csvMetric];
-          // For Health Index, invert (100 - value) since we're using "Yes" to problems
           if (currentMetric === "Health Index" && value !== null && !isNaN(value)) {
             value = 100 - value;
           }
@@ -788,10 +755,8 @@
         return;
       }
 
-      // Get unique demographic values
       const demographicValues = [...new Set(chartData.map(d => d.demographic))];
 
-      // Scales
       const x0 = d3.scaleBand()
         .domain(demographicValues)
         .range([0, width])
@@ -806,7 +771,6 @@
         .domain([0, 100])
         .range([height, 0]);
 
-      // X axis
       g.append("g")
         .attr("transform", `translate(0,${height})`)
         .call(d3.axisBottom(x0))
@@ -815,14 +779,21 @@
         .style("text-anchor", "end")
         .attr("dx", "-.8em")
         .attr("dy", ".15em")
-        .style("font-size", "11px");
+        .style("font-size", "11px")
+        .each(function() {
+          const text = d3.select(this);
+          const textContent = text.text();
+          
+          if (textContent.length > 15) {
+            text.text(textContent.substring(0, 13) + "...");
+            text.append("title").text(textContent);
+          }
+        });
 
-      // Y axis
       g.append("g")
         .call(d3.axisLeft(y).ticks(10).tickFormat(d => d + "%"))
         .style("font-size", "11px");
 
-      // Bars
       const demographicGroups = g.selectAll(".demographic-group")
         .data(demographicValues)
         .enter()
@@ -838,7 +809,7 @@
         .attr("y", d => y(d.value))
         .attr("width", x1.bandwidth())
         .attr("height", d => height - y(d.value))
-        .attr("fill", d => countryColors[d.countryIdx])
+        .attr("fill", d => countryColors[d.countryIdx % countryColors.length])
         .attr("opacity", 0.8)
         .on("mouseover", function(event, d) {
           d3.select(this).attr("opacity", 1);
@@ -861,50 +832,18 @@
           tooltip.style("opacity", 0);
         });
 
-      // Global averages (if enabled)
-      if (showGlobalAverages) {
-        demographicValues.forEach(demo => {
-          const demoData = data.filter(d => 
-            d.Demographic_Type === currentDemographic && 
-            d.Demographic_Value === demo
-          );
-          
-          let values = demoData.map(d => d[csvMetric]).filter(v => v !== null && !isNaN(v));
-          
-          if (currentMetric === "Health Index") {
-            values = values.map(v => 100 - v);
-          }
-          
-          if (values.length > 0) {
-            const avgValue = d3.mean(values);
-            
-            g.append("line")
-              .attr("x1", x0(demo))
-              .attr("x2", x0(demo) + x0.bandwidth())
-              .attr("y1", y(avgValue))
-              .attr("y2", y(avgValue))
-              .attr("stroke", "#e11d48")
-              .attr("stroke-width", 2)
-              .attr("stroke-dasharray", "4,4")
-              .attr("opacity", 0.8);
-          }
-        });
-      }
-
-      // Legend
-      const legend = d3.select("#comparison-chart")
-        .append("g")
-        .attr("class", "chart-legend")
-        .attr("transform", `translate(${margin.left}, ${height + margin.top + margin.bottom - 20})`);
+      const legendGroup = svg.append("g")
+        .attr("transform", `translate(${margin.left}, ${height + margin.top + 60})`);
 
       selectedCountries.forEach((country, idx) => {
-        const legendItem = legend.append("g")
-          .attr("transform", `translate(${idx * 120}, 0)`);
+        const legendItem = legendGroup.append("g")
+          .attr("class", "chart-legend-item");
 
         legendItem.append("rect")
+          .attr("class", "chart-legend-color")
           .attr("width", 20)
           .attr("height", 12)
-          .attr("fill", countryColors[idx]);
+          .attr("fill", countryColors[idx % countryColors.length]);
 
         legendItem.append("text")
           .attr("x", 25)
@@ -913,33 +852,29 @@
           .text(country);
       });
 
-      // Add global average to legend if shown
-      if (showGlobalAverages) {
-        const globalLegendItem = legend.append("g")
-          .attr("transform", `translate(${selectedCountries.length * 120}, 0)`);
+      let currentX = 0;
+      let currentY = 0;
+      const lineHeight = 20;
+      const maxWidth = width;
 
-        globalLegendItem.append("line")
-          .attr("x1", 0)
-          .attr("x2", 20)
-          .attr("y1", 6)
-          .attr("y2", 6)
-          .attr("stroke", "#e11d48")
-          .attr("stroke-width", 2)
-          .attr("stroke-dasharray", "4,4");
+      legendGroup.selectAll(".chart-legend-item").each(function(d, i) {
+        const item = d3.select(this);
+        const bbox = item.node().getBBox();
+        const itemWidth = bbox.width + 15;
 
-        globalLegendItem.append("text")
-          .attr("x", 25)
-          .attr("y", 10)
-          .style("font-size", "12px")
-          .text("Global Avg");
-      }
+        if (currentX + itemWidth > maxWidth && currentX > 0) {
+          currentX = 0;
+          currentY += lineHeight;
+        }
+
+        item.attr("transform", `translate(${currentX}, ${currentY})`);
+        currentX += itemWidth;
+      });
     }
 
-    // Metric selector
     document.getElementById("metric-select").addEventListener("change", function() {
       currentMetric = this.value;
       
-      // Update description placeholder
       const descriptions = {
         "Thriving Index": "This metric provides valuable insights into population well-being across different countries and demographic groups. Select different metrics above to explore various aspects of quality of life.",
         "Health Index": "This metric shows the percentage of respondents who report good health outcomes. Higher values indicate better overall health in the population.",
@@ -950,7 +885,6 @@
       
       document.getElementById("metric-description-text").textContent = descriptions[currentMetric];
       
-      // Reload world data to update map colors
       d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
         .then(worldData => {
           updateMap(worldData);
