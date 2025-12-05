@@ -13,10 +13,15 @@
     }
 
     .header {
-      background: white;
-      padding: 20px;
-      border-bottom: 1px solid #ddd;
+    background: white;
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+
+    display: flex;        
+    align-items: center;        
+    justify-content: space-between; 
     }
+
 
     .header h1 {
       margin: 0;
@@ -277,12 +282,65 @@
       border-radius: 2px;
       flex-shrink: 0;
     }
+
+    .modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.4);
+    }
+
+    /* Modal box */
+    .modal-content {
+    background: white;
+    width: 60%;
+    max-width: 600px;
+    margin: 12% auto;
+    padding: 20px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    }
+
+    /* Close button */
+    .close {
+    float: right;
+    font-size: 22px;
+    cursor: pointer;
+    color: #444;
+    }
+    .close:hover {
+    color: black;
+    }
+
   </style>
 </head>
 <body>
   <div class="header">
     <h1>Country Well-Being Explorer</h1>
+
+    <button id="open-modal" style="margin-top: 10px; padding: 6px 12px;">
+      About this visualization
+    </button>
   </div>
+
+
+
+  <!-- Modal Structure -->
+    <div id="info-modal" class="modal">
+    <div class="modal-content">
+        <span id="close-modal" class="close">&times;</span>
+        <h2>About This Visualization</h2>
+        <p>
+        Write the explanation about your visualization here.
+        </p>
+    </div>
+    </div>
+
+
 
   <div class="layout">
     <div class="left-section">
@@ -325,6 +383,26 @@
   <div class="tooltip"></div>
 
   <script>
+    // Modal logic
+    const modal = document.getElementById("info-modal");
+    const openBtn = document.getElementById("open-modal");
+    const closeBtn = document.getElementById("close-modal");
+
+    openBtn.onclick = () => {
+    modal.style.display = "block";
+    };
+
+    closeBtn.onclick = () => {
+    modal.style.display = "none";
+    };
+
+    window.onclick = (event) => {
+    if (event.target === modal) {
+        modal.style.display = "none";
+    }
+    };
+
+
     const CSV_FILENAME = "data/better_wellbeing.csv";
 
     const mapContainer = document.getElementById("map-container");
