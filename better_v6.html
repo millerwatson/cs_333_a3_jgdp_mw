@@ -317,6 +317,8 @@
       padding: 20px;
       border-radius: 6px;
       border: 1px solid #ccc;
+      max-height: calc(100vh - 210px);
+      overflow-y: auto;
     }
 
     /* Close button */
@@ -341,14 +343,16 @@
     </button>
   </div>
 
-  <!-- Modal Structure -->
    <div id="info-modal" class="modal">
     <div class="modal-content">
       <span id="close-modal" class="close">&times;</span>
       <h2>About This Visualization</h2>
       <p>
         This interactive dashboard explores global well-being using data broken down by country,
-        demographic groups, and key life metrics.
+        demographic groups, and key life metrics. Use it to understand how well-being differs by country and demographic.
+
+        Selecting a country breaks down the aggregate stat the country is colored with into demographic components, such as age groups. Selecting
+        multiple countries allows comparisons between the same.
       </p>
       <ul>
         <li><strong>World Map:</strong> Select up to four countries and compare how they score across different well-being indicators using a color-coded map.</li>
@@ -361,6 +365,16 @@
         The goal of this visualization is to make complex survey data easier to explore, compare,
         and interpret in an intuitive, interactive way.
       </p>
+      <h3>
+        About the Survey
+      </h3>
+      <p>
+        The Global Well-being Initiative Dataset is the result of a partnership between Gallup and the
+        Wellbeing for Planet Earth Foundation. n=1,000 respondents each from 118 countries were polled
+        in 2020 to create the survey results, resulting in 118,000 total respondents. The survey aims to give
+        multiple simple dimensions of well-being, going further than just life satisfaction.
+      </p>
+      <p><em>Gallup World Poll, Global Wellbeing Initiative dataset, 2020</em></p>
     </div>
   </div>
 
@@ -388,7 +402,7 @@
 
         <div class="metric-description">
           <h4>About this metric</h4>
-          <p id="metric-description-text">This metric provides valuable insights into population well-being across different countries and demographic groups. Select different metrics above to explore various aspects of quality of life.</p>
+          <p id="metric-description-text">This metric is a valuable general indicator of well-being. It is the percentage of individuals in the survey who reported they were thriving, as opposed to struggling or suffering.</p>
         </div>
       </div>
     </div>
@@ -405,7 +419,6 @@
   <div class="tooltip"></div>
 
   <script>
-    // Modal logic
     const modal = document.getElementById("info-modal");
     const openBtn = document.getElementById("open-modal");
     const closeBtn = document.getElementById("close-modal");
@@ -746,16 +759,13 @@
         .attr("for", "show-global-avg")
         .text("Show global averages");
 
-      // Clear button: removes all selected countries except "Global Average"
       optionsDiv.append("button")
         .attr("type", "button")
         .attr("class", "clear-button")
         .text("Clear countries")
         .on("click", () => {
-          // Keep only "Global Average" if it's currently selected
           selectedCountries = selectedCountries.filter(c => c === "Global Average");
 
-          // Update map highlighting
           g.selectAll("path")
             .classed("selected", d => selectedCountries.includes(d.properties.name));
 
@@ -822,9 +832,8 @@
       const container = document.getElementById("charts-container");
       const containerWidth = container.clientWidth;
       
-      // Increased bottom margin to give more space for wrapped labels
       const margin = { top: 20, right: 20, bottom: 120, left: 60 };
-      const width = Math.max(300, containerWidth - 40 - margin.left - margin.right);
+      const width = Math.max(300, containerWidth - 80 - margin.left - margin.right);
       const height = 400 - margin.top - margin.bottom;
 
       svg
@@ -891,7 +900,6 @@
         .domain([0, 100])
         .range([height, 0]);
 
-      // X axis with wrapped labels
       gChart.append("g")
         .attr("transform", `translate(0,${height})`)
         .call(d3.axisBottom(x0))
@@ -903,9 +911,9 @@
           const text = d3.select(this);
           const fullText = text.text();
           const words = fullText.split(/\s+/);
-          const maxWordsPerLine = 2; // adjust to taste
+          const maxWordsPerLine = 2;
 
-          text.text(null); // clear original
+          text.text(null);
 
           for (let i = 0; i < words.length; i += maxWordsPerLine) {
             const line = words.slice(i, i + maxWordsPerLine).join(" ");
@@ -1002,11 +1010,11 @@
       currentMetric = this.value;
       
       const descriptions = {
-        "Thriving Index": "This metric provides valuable insights into population well-being across different countries and demographic groups. Select different metrics above to explore various aspects of quality of life.",
-        "Health Index": "This metric shows the percentage of respondents who report good health outcomes. Higher values indicate better overall health in the population.",
-        "Balance in Life": "This metric measures how people perceive balance across various aspects of their lives, including work, family, and personal time.",
-        "Enjoy Work": "This metric indicates the percentage of people who report enjoying the work they do every day, reflecting job satisfaction and engagement.",
-        "Work Freedom": "This metric shows the degree to which people feel they have choices in the type of work they can pursue."
+        "Thriving Index": "This metric is a valuable general indicator of well-being. It is the percentage of individuals in the survey who reported they were thriving, as opposed to struggling or suffering.",
+        "Health Index": "This metric shows the percentage of respondents who reported not having health problems on a consistent basis; i.e. those who are consistently healthy.",
+        "Balance in Life": "This metric is the percentage of individuals who indicated that they thought the various aspects of their life were in balance.",
+        "Enjoy Work": "This metric is the percentage of individuals who report enjoying the work they do every day.",
+        "Work Freedom": "This metric is the percentage of individuals that reported feeling they had freedom of choice in the type of work they pursue."
       };
       
       document.getElementById("metric-description-text").textContent = descriptions[currentMetric];
